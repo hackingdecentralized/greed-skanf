@@ -1,0 +1,59 @@
+# base image
+FROM ubuntu:22.04
+
+
+ENV GREED_DIR=/home/greed
+ENV GIGAHORSE_DIR=$GREED_DIR/gigahorse-toolchain
+
+
+# install  dependencies
+RUN apt-get update && apt-get install -y \
+    python3 python3-pip python3-venv virtualenv git \
+    gcc cmake gperf libgmp-dev bison build-essential clang \
+    doxygen flex g++ libffi-dev libffi7 libncurses5-dev libsqlite3-dev \
+    zlib1g-dev libboost-all-dev wget unzip mcpp sqlite genisoimage \
+    curl make pkg-config nano time software-properties-common \
+    && apt-get clean
+
+WORKDIR /home
+
+# install souffle 2.4 from source
+RUN git clone --branch 2.4 https://github.com/souffle-lang/souffle
+WORKDIR /home/souffle
+RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr
+RUN cmake --build build --target install
+
+
+WORKDIR /home
+# download greed
+RUN git clone https://github.com/ucsb-seclab/greed.git
+
+# install gigahorse
+WORKDIR $GREED_DIR
+RUN git clone https://github.com/nevillegrech/gigahorse-toolchain.git --recursive
+WORKDIR $GIGAHORSE_DIR/souffle-addon
+# a test will fail while running make, ignore this
+RUN make WORD_SIZE=$(souffle --version | sed -n 3p | cut -c12,13) -i
+
+
+WORKDIR $GREED_DIR
+
+# copy and compile greed client; this part is copied from greeds setup.sh script
+RUN cp $GREED_DIR/resources/greed_client.dl $GIGAHORSE_DIR/clientlib/
+
+RUN souffle --jobs 1 -M "GIGAHORSE_DIR=$GIGAHORSE_DIR BULK_ANALYSIS=" \
+        -o $GIGAHORSE_DIR/clients/main.dl_compiled.tmp \
+        $GIGAHORSE_DIR/logic/main.dl \
+        -L $GIGAHORSE_DIR/souffle-addon || (echo "Failed to build main.dl_compiled" && exit 1) && \
+    mv $GIGAHORSE_DIR/clients/main.dl_compiled.tmp $GIGAHORSE_DIR/clients/main.dl_compiled && \
+    mv $GIGAHORSE_DIR/clients/main.dl_compiled.tmp.cpp $GIGAHORSE_DIR/clients/main.dl_compiled.cpp
+
+ RUN souffle --jobs 1 -M "GIGAHORSE_DIR=$GIGAHORSE_DIR BULK_ANALYSIS=" \
+    -o $GIGAHORSE_DIR/clients/greed_client.dl_compiled.tmp \
+    $GIGAHORSE_DIR/clientlib/greed_client.dl \
+    -L $GIGAHORSE_DIR/souffle-addon || (echo "Failed to build greed_client.dl_compiled" && exit 1) && \
+mv $GIGAHORSE_DIR/clients/greed_client.dl_compiled.tmp $GIGAHORSE_DIR/clients/greed_client.dl_compiled && \
+mv $GIGAHORSE_DIR/clients/greed_client.dl_compiled.tmp.cpp $GIGAHORSE_DIR/clients/greed_client.dl_compiled.cpp
+
+# run greed setup.sh with python virtualenv enabled
+RUN virtualenv greed-venv && . greed-venv/bin/activate && ./setup.sh --no-gigahorse
