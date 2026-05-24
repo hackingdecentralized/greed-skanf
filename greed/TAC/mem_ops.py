@@ -96,13 +96,11 @@ class TAC_Tload(TAC_Statement):
 
     @TAC_Statement.handler_with_side_effects
     def handle(self, state: SymbolicEVMState):
-        raise NotImplementedError()
-        # v = state.storage[self.key_val]
-        # state.registers[self.res1_var] = v
+        v = state.storage[self.key_val]
+        state.registers[self.res1_var] = v
 
-        # state.set_next_pc()
-        # return [state]
-
+        state.set_next_pc()
+        return [state]
 
 class TAC_Tstore(TAC_Statement):
     __internal_name__ = "TSTORE"
@@ -113,12 +111,10 @@ class TAC_Tstore(TAC_Statement):
 
     @TAC_Statement.handler_with_side_effects
     def handle(self, state: SymbolicEVMState):
-        raise NotImplementedError()
-        # state.storage[self.key_val] = self.value_val
+        state.storage[self.key_val] = self.value_val
 
-        # state.set_next_pc()
-        # return [state]
-
+        state.set_next_pc()
+        return [state]
 
 class TAC_Msize(TAC_Statement):
     __internal_name__ = "MSIZE"

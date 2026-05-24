@@ -1,6 +1,7 @@
 #include "decompiler_imports.dl"
 
 #include "guards.dl"
+#include "origin_guards.dl"
 #include "loops_semantics.dl"
 
 #include "memory_modeling/memory_modeling.dl"
@@ -12,6 +13,7 @@
 
 // guards analysis output
 .output StaticallyGuardedBlock
+.output StaticallyOriginGuardedBlock
 .output Dominates
 
 // calldata arrays (and loops) output

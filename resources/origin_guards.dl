@@ -1,0 +1,99 @@
+#pragma once
+
+#include "memory_modeling/memory_modeling.dl"
+#include "storage_modeling/storage_modeling.dl"
+#include "flows.dl"
+
+// TODO: Add some kind of Mask Flow to avoid using DataFlows all over the place
+
+/**
+  Models popular guarding patterns in smart contracts.
+  Some examples:
+   - `require(tx.origin == storageVar)`
+   - `require(tx.origin == 0x412312...12a3f1)`
+   - `require(tx.origin - 0x412312...12a3f1 == 0)`
+   - `require(tx.origin - 0x412312...12a3f1 == 0)`
+   - `require(tx.origin == address(this))`
+   - `require(tx.origin == storageVar.owner())`
+*/
+.decl StaticallyOriginGuardedBlock(guardedBlock: Block, globalVal: Value)
+
+StaticallyOriginGuardedBlock(guardedBlock, globalVal) :-
+  ControlsWith(_, guardedBlock, predicate),
+  OriginGuard(globalVal, predicate).
+
+.decl CheckVars(a: Variable, b: Variable, res: Variable)
+
+CheckVars(a, b, res) :-
+   EQ(_, a, b, res) ; EQ(_, b, a, res) ; SUB(_, a, b, res); SUB(_, b, a, res) ; XOR(_, a, b, res) ; XOR(_, b, a, res).
+
+// Internal relation, used by `StaticallyGuardedBlock`
+.decl OriginGuard(globalVal: Value, predicate: Variable)
+
+OriginGuard(cat("CONSTANT_", val), predicate) :-
+  ORIGIN(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  CheckVars(const, msgsender, predicateFrom),
+  Variable_Value(const, val),
+  DataFlows(predicateFrom, predicate).
+
+OriginGuard(globalVal, predicate) :-
+  ORIGIN(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  CheckVars(global, msgsender, predicateFrom),
+  LoadGlobalVariable(_, globalVal, globalFrom),
+  DataFlows(globalFrom, global),
+  DataFlows(predicateFrom, predicate).
+
+#ifdef DATA_STRUCTURE_SUPPORT
+OriginGuard(dataId, predicate) :-
+  ORIGIN(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  LoadFromDataStructure(_, dataId, msgsender, inop_result),
+  DataFlows(inop_result, predicate).
+
+OriginGuard(dataId, predicate) :-
+  ORIGIN(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  CheckVars(constDataStrLoad, msgsender, predicateFrom),
+  LoadFromDataStructure(_, dataId, constVar, constDataStrLoadFrom),
+  Variable_Value(constVar, _),
+  DataFlows(constDataStrLoadFrom, constDataStrLoad),
+  DataFlows(predicateFrom, predicate).
+#endif
+
+#ifdef MEMORY_MODELING_SUPPORT
+
+OriginGuard(globalVal, predicate) :-
+  ORIGIN(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  CheckVars(callReturn, msgsender, predicateFrom),
+  LoadGlobalVariable(_, globalVal, globalFrom),
+  DataFlows(globalFrom, global),
+  Statement_Uses(call, global, 1),
+  ExternalCall_NumOfArgs(call, 0),
+  ExternalCall_ActualReturn(call, callReturnFrom, _),
+  DataFlows(callReturnFrom, callReturn),
+  DataFlows(predicateFrom, predicate).
+
+OriginGuard(globalVal, predicate) :-
+  ORIGIN(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  StatementUsesMemory_ActualMemoryArg(call, _, 1, msgsender),
+  ExternalCall_NumOfArgs(call, 1),
+  Statement_Uses(call, global, 1),
+  DataFlows(globalFrom, global),
+  LoadGlobalVariable(_, globalVal, globalFrom),
+  ExternalCall_ActualReturn(call, callReturnFrom, _),
+  DataFlows(callReturnFrom, predicate).
+
+#endif
+
+           
+OriginGuard("this", predicate) :-
+  CALLER(_, msgsenderFrom),
+  DataFlows(msgsenderFrom, msgsender),
+  CheckVars(this, msgsender, predicateFrom),
+  DataFlows(thisFrom, this),
+  ADDRESS(_, thisFrom),
+  DataFlows(predicateFrom, predicate).

@@ -84,10 +84,47 @@ class TAC_Phi(TAC_Statement):
     __internal_name__ = "PHI"
     __aliases__ = {}
 
-    @TAC_Statement.handler_without_side_effects
+    @TAC_Statement.handler_with_side_effects
     def handle(self, state: SymbolicEVMState):
+        assert len(self.res_vars) == 1, "PHI statements must have exactly one result variable"
+
+        # we need to iterate over the arguments and find the register that was most recently written
+        most_recent_write_instruction_count = -1
+        most_recent_write_register_name: str = None
+        current_block_id = state.curr_stmt.block_id
+        
+        # count the times the current block id appears in the trace
+        current_block_count = 0
+        in_segment = False
+        historical_block_ids = [i.block_id for i in state.trace] + [state.curr_stmt.block_id]
+        for block_id in historical_block_ids:
+            if block_id == current_block_id:
+                if not in_segment:
+                    current_block_count += 1
+                    in_segment = True
+            else:
+                in_segment = False
+
+
+        for arg_var in self.arg_vars:
+            reg = state.registers.register(arg_var)
+            if reg.last_written_instruction_count > most_recent_write_instruction_count and reg.phi_block_id != (current_block_id, current_block_count):
+                most_recent_write_instruction_count = reg.last_written_instruction_count
+                most_recent_write_register_name = arg_var
+        
+        assert most_recent_write_register_name is not None, f"PHI statement {self.id} has no valid arguments"
+
+        # transfer value from most recent write to result
+        state.registers[self.res1_var] = state.registers[most_recent_write_register_name]
+        state.registers.register(most_recent_write_register_name).phi_block_id = (current_block_id, current_block_count)
+
         state.set_next_pc()
         return [state]
+
+    def set_arg_val(self, _):
+        # skip this -- we do not need to set the arg values for phi statements, and moreover
+        # the args may not yet be defined
+        pass
 
 
 class TAC_Const(TAC_Statement):

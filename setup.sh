@@ -10,7 +10,12 @@ bold=$(tput bold)
 normal=$(tput sgr0)
 red=$(tput setaf 160)
 
-j=1
+SUDO=""
+if [ "$(id -u)" -ne 0 ]; then
+  SUDO="sudo"
+fi
+
+j=8
 
 while (( $# >= 1 )); do
     case $1 in
@@ -32,7 +37,7 @@ GREED_DIR=`readlink -f $GREED_DIR` || { echo "${bold}${red}Can't find greed abso
 GIGAHORSE_DIR=$GREED_DIR/gigahorse-toolchain
 
 VIRTUAL_ENV_BIN=$VIRTUAL_ENV/bin
-VIRTUAL_ENV_LIB=`echo $VIRTUAL_ENV/lib/python3.*/site-packages`
+VIRTUAL_ENV_LIB=$(python -c "import site; print(site.getsitepackages()[0])")
 
 ########################################################################################################################
 ########################################################################################################################
@@ -60,7 +65,7 @@ if [ ${#MISSING_APT_PACKAGES[@]} -gt 0 ]; then
   echo "${bold}${red}The following packages are missing: ${MISSING_APT_PACKAGES[*]}. Please install them before proceeding (e.g., sudo apt install ${MISSING_APT_PACKAGES[*]})${normal}"
   if [ $IS_UBUNTU = TRUE ]; then
     read -rsn1 -p "Or press any key to install them now (ctrl-c to abort)"
-    sudo apt update && sudo apt install ${MISSING_APT_PACKAGES[*]} || { echo "${bold}${red}Failed to install missing packages${normal}"; exit 1; }
+    $SUDO apt update && $SUDO apt install ${MISSING_APT_PACKAGES[*]} || { echo "${bold}${red}Failed to install missing packages${normal}"; exit 1; }
   else
     exit 1
   fi
@@ -71,10 +76,10 @@ if [ $IS_SOUFFLE_MISSING = TRUE ]; then
   if [ $IS_UBUNTU = TRUE ]; then
     read -rsn1 -p "Or press any key to install it now (ctrl-c to abort)"
     wget https://github.com/souffle-lang/souffle/releases/download/2.4/x86_64-ubuntu-2004-souffle-2.4-Linux.deb -O /tmp/x86_64-ubuntu-2004-souffle-2.4-Linux.deb &&
-    sudo dpkg -i /tmp/x86_64-ubuntu-2004-souffle-2.4-Linux.deb &&
+    $SUDO dpkg -i /tmp/x86_64-ubuntu-2004-souffle-2.4-Linux.deb &&
     rm /tmp/x86_64-ubuntu-2004-souffle-2.4-Linux.deb || { rm -f /tmp/x86_64-ubuntu-2004-souffle-2.4-Linux.deb; echo "${bold}${red}Failed to install souffle${normal}"; exit 1; }
   else
-    exit 1
+    exit 1 
   fi
 else
   SOUFFLE_VERSION=$(souffle --version | grep -oP "Version: \K[0-9]+\.[0-9]+")
@@ -113,7 +118,7 @@ make || { echo "${bold}${red}Failed to run make${normal}"; exit 1; }
 ln -sf $GREED_DIR/yices2/build/*-release/bin/* $VIRTUAL_ENV_BIN/
 ln -sf $GREED_DIR/yices2/build/*-release/lib/* $VIRTUAL_ENV_LIB/
 LIBNAME=$(python -c 'from ctypes.util import find_library; print(find_library("yices") or "libyices.so")')
-cp $VIRTUAL_ENV/lib/python3.*/site-packages/libyices.so.* $VIRTUAL_ENV_LIB/$LIBNAME
+cp $VIRTUAL_ENV_LIB/libyices.so.* $VIRTUAL_ENV_LIB/$LIBNAME
 
 cd $GREED_DIR
 
@@ -149,13 +154,13 @@ if [ -z $NO_GIGAHORSE ]; then
 
   # clone the gigahorse-toolchain repo
   if [ ! -d $GREED_DIR/gigahorse-toolchain ]; then
-    git clone --recursive https://github.com/nevillegrech/gigahorse-toolchain.git $GIGAHORSE_DIR
+    git clone --recursive https://github.com/hackingdecentralized/gigahorse-skanf.git $GIGAHORSE_DIR
     cd $GIGAHORSE_DIR
-    git checkout 10de8a71ca7b12f657e0de18e455e02d408089b8
   fi
 
   # copy greed client
-  cp $GREED_DIR/resources/greed_client.dl $GIGAHORSE_DIR/clientlib/
+  # cp $GREED_DIR/resources/greed_client.dl $GIGAHORSE_DIR/clientlib/
+  # cp $GREED_DIR/resources/origin_guards.dl $GIGAHORSE_DIR/clientlib/
 
   # compile souffle-addon
   echo "Compiling souffle-addon.."
@@ -173,7 +178,9 @@ if [ -z $NO_GIGAHORSE ]; then
     echo "Successfully compiled $1.."
   }
   compile "main.dl" "logic/main.dl"
+  compile "fallback_scalable.dl" "logic/fallback_scalable.dl"
   compile "greed_client.dl" "clientlib/greed_client.dl"
+  compile "jump_table_analysis.dl" "clients/jump_table_analysis.dl"
 else
   true
 fi

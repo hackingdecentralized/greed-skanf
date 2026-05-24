@@ -1,9 +1,13 @@
 #!/bin/bash
+count=0
+MAX_RETRIES=10
 
 while (( $# >= 1 )); do
     case $1 in
     --file) HEX_FILE=$2; shift; shift;;
     --timeout) TIMEOUT=$2; shift; shift;;
+    --fix) FIX=true; shift;;
+    --loop) LOOP=true; shift;;
     *) break;
     esac;
 done
@@ -13,8 +17,7 @@ if [[ -z $HEX_FILE ]]; then
   exit 1
 elif [[ -z $TIMEOUT ]]; then
   TIMEOUT=120
-#  echo usage: analyze_hex.sh --file \<contract .hex file\> --timeout \<timeout\>
-#  exit 1
+
 elif [ ! -f $HEX_FILE ]; then
   echo $HEX_FILE is not a file
   exit 1
@@ -34,12 +37,42 @@ elif [ ! -f $GIGAHORSE_DIR/clients/greed_client.dl_compiled ]; then
 fi
 
 echo "Running gigahorse.py"
-/usr/bin/time -v $GIGAHORSE_DIR/gigahorse.py -q QUIET -T $TIMEOUT --reuse_datalog_bin --disable_inline -C $GIGAHORSE_DIR/clients/greed_client.dl_compiled,$GIGAHORSE_DIR/clients/visualizeout.py $HEX_FILE &> exec_info &&
-curr_dir=$(pwd) && cd $GIGAHORSE_DIR && gigahorse_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tGigahorse version: $gigahorse_version\n" >> exec_info &&
-curr_dir=$(pwd) && cd $GREED_DIR && greed_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tgreed version: $greed_version\n" >> exec_info
-cp .temp/contract/out/* .
-cp .temp/contract/contract.dasm .
-cp .temp/contract/*.csv .
+if [[ $FIX == true ]]; then
+  $GIGAHORSE_DIR/gigahorse.py  $HEX_FILE -q -T $TIMEOUT --reuse_datalog_bin --disable_inline -C $GIGAHORSE_DIR/clients/greed_client.dl_compiled,$GIGAHORSE_DIR/clients/visualizeout.py,$GIGAHORSE_DIR/clients/jump_table_analysis.dl_compiled
+  echo "Round 0 done. Now starting fix loop."
+  /usr/bin/time -v $GIGAHORSE_DIR/gigahorse.py  $HEX_FILE -q -T $TIMEOUT --reuse_datalog_bin --disable_inline -C $GIGAHORSE_DIR/clients/greed_client.dl_compiled,$GIGAHORSE_DIR/clients/visualizeout.py,$GIGAHORSE_DIR/clients/jump_table_analysis.dl_compiled --fix &> exec_info && curr_dir=$(pwd) && cd $GIGAHORSE_DIR && gigahorse_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tGigahorse version: $gigahorse_version\n" >> exec_info && curr_dir=$(pwd) && cd $GREED_DIR && greed_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tgreed version: $greed_version\n" >> exec_info
+  if [ "$LOOP" = true ]; then
+    while true; do
+      curr_dir=$(pwd)
+      output=$(python3 $GIGAHORSE_DIR/check_jumptable.py $curr_dir/.temp/contract/out $curr_dir/.temp/contract_fixed/out)
+
+      if [ "$output" == "DONE" ]; then
+          echo "Execution result is DONE. Exiting loop."
+          break
+      fi
+
+      count=$((count+1))
+      if [ $count -ge $MAX_RETRIES ]; then
+          echo "Exceeded maximum retries. Exiting."
+          break
+      fi
+
+      echo "Output: $output. Retrying $count..."
+      rm -rf .temp/contract_fixed
+      /usr/bin/time -v $GIGAHORSE_DIR/gigahorse.py  $HEX_FILE -q -T $TIMEOUT --reuse_datalog_bin --disable_inline -C $GIGAHORSE_DIR/clients/greed_client.dl_compiled,$GIGAHORSE_DIR/clients/visualizeout.py,$GIGAHORSE_DIR/clients/jump_table_analysis.dl_compiled --fix &> exec_info && curr_dir=$(pwd) && cd $GIGAHORSE_DIR && gigahorse_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tGigahorse version: $gigahorse_version\n" >> exec_info && curr_dir=$(pwd) && cd $GREED_DIR && greed_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tgreed version: $greed_version\n" >> exec_info
+    done
+  fi
+  cp .temp/contract_fixed/out/* .
+  cp .temp/contract_fixed/contract.dasm .
+  cp .temp/contract_fixed/contract_patch.dasm .
+  cp .temp/contract_fixed/*.csv .
+  cp .temp/contract/out/JTA* .
+else
+  /usr/bin/time -v $GIGAHORSE_DIR/gigahorse.py  $HEX_FILE -q -T $TIMEOUT --reuse_datalog_bin --disable_inline -C $GIGAHORSE_DIR/clients/greed_client.dl_compiled,$GIGAHORSE_DIR/clients/visualizeout.py,$GIGAHORSE_DIR/clients/jump_table_analysis.dl_compiled &> exec_info && curr_dir=$(pwd) && cd $GIGAHORSE_DIR && gigahorse_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tGigahorse version: $gigahorse_version\n" >> exec_info && curr_dir=$(pwd) && cd $GREED_DIR && greed_version=$(git rev-parse HEAD) && cd $curr_dir && printf "\tgreed version: $greed_version\n" >> exec_info
+  cp .temp/contract/out/* .
+  cp .temp/contract/contract.dasm .
+  cp .temp/contract/*.csv .
+fi
 mv bytecode.hex contract.hex
 rm -rf .temp Analytics_ReachableUnderContext.csv Analytics_Contexts.csv
 chmod 664 *

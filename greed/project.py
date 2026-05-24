@@ -168,5 +168,3 @@ class Project(object):
 
         with open(filename, "w") as dump_file:
             dump_file.write(dot)
-
-
