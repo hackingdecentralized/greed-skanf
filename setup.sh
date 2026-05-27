@@ -170,6 +170,7 @@ if [ -z $NO_GIGAHORSE ]; then
 
   # compile gigahorse clients
   echo "Compiling gigahorse clients. This will take some time.."
+  mkdir -p $GIGAHORSE_DIR/cache
   function compile () {
     echo "Compiling $1.."
     souffle --jobs $j -M "GIGAHORSE_DIR=$GIGAHORSE_DIR BULK_ANALYSIS=" -o $GIGAHORSE_DIR/clients/$1_compiled.tmp $GIGAHORSE_DIR/$2 -L $GIGAHORSE_DIR/souffle-addon || { echo "${bold}${red}Failed to build $1_compiled${normal}"; exit 1; } &&
