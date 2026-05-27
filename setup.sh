@@ -154,7 +154,7 @@ if [ -z $NO_GIGAHORSE ]; then
 
   # clone the gigahorse-toolchain repo
   if [ ! -d $GREED_DIR/gigahorse-toolchain ]; then
-    git clone --recursive https://github.com/hackingdecentralized/gigahorse-skanf.git $GIGAHORSE_DIR
+    git clone --recursive --branch skanf https://github.com/hackingdecentralized/gigahorse-skanf.git $GIGAHORSE_DIR
     cd $GIGAHORSE_DIR
   fi
 
