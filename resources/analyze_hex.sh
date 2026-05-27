@@ -36,7 +36,6 @@ elif [ ! -f $GIGAHORSE_DIR/clients/greed_client.dl_compiled ]; then
   exit 1
 fi
 
-echo "Running gigahorse.py"
 if [[ $FIX == true ]]; then
   $GIGAHORSE_DIR/gigahorse.py  $HEX_FILE -q -T $TIMEOUT --reuse_datalog_bin --disable_inline -C $GIGAHORSE_DIR/clients/greed_client.dl_compiled,$GIGAHORSE_DIR/clients/visualizeout.py,$GIGAHORSE_DIR/clients/jump_table_analysis.dl_compiled
   echo "Round 0 done. Now starting fix loop."

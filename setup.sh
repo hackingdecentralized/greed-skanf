@@ -174,11 +174,13 @@ if [ -z $NO_GIGAHORSE ]; then
     echo "Compiling $1.."
     souffle --jobs $j -M "GIGAHORSE_DIR=$GIGAHORSE_DIR BULK_ANALYSIS=" -o $GIGAHORSE_DIR/clients/$1_compiled.tmp $GIGAHORSE_DIR/$2 -L $GIGAHORSE_DIR/souffle-addon || { echo "${bold}${red}Failed to build $1_compiled${normal}"; exit 1; } &&
     mv $GIGAHORSE_DIR/clients/$1_compiled.tmp $GIGAHORSE_DIR/clients/$1_compiled &&
+    cp $GIGAHORSE_DIR/clients/$1_compiled $GIGAHORSE_DIR/cache/$1_compiled &&
     mv $GIGAHORSE_DIR/clients/$1_compiled.tmp.cpp $GIGAHORSE_DIR/clients/$1_compiled.cpp &&
     echo "Successfully compiled $1.."
   }
   compile "main.dl" "logic/main.dl"
   compile "fallback_scalable.dl" "logic/fallback_scalable.dl"
+  compile "last_resort.dl" "logic/last_resort.dl"
   compile "greed_client.dl" "clientlib/greed_client.dl"
   compile "jump_table_analysis.dl" "clients/jump_table_analysis.dl"
 else
