@@ -1,26 +1,61 @@
 #!/bin/bash
+set -euo pipefail
+
 count=0
 MAX_RETRIES=10
+TIMEOUT=120
+FIX=false
+LOOP=false
 
 while (( $# >= 1 )); do
-    case $1 in
-    --file) HEX_FILE=$2; shift; shift;;
-    --timeout) TIMEOUT=$2; shift; shift;;
-    --fix) FIX=true; shift;;
-    --loop) LOOP=true; shift;;
-    *) break;
-    esac;
+    case "$1" in
+        --file)
+            if (( $# < 2 )); then
+                echo "error: --file requires an argument"
+                exit 1
+            fi
+            HEX_FILE="$2"
+            shift 2
+            ;;
+        --timeout)
+            if (( $# < 2 )); then
+                echo "error: --timeout requires an argument"
+                exit 1
+            fi
+            TIMEOUT="$2"
+            shift 2
+            ;;
+        --fix)
+            FIX=true
+            shift
+            ;;
+        --loop)
+            LOOP=true
+            shift
+            ;;
+        *)
+            echo "unknown argument: $1"
+            echo "usage: analyze_hex.sh --file <contract .hex file> [--timeout <timeout>] [--fix] [--loop]"
+            exit 1
+            ;;
+    esac
 done
 
-if [[ -z $HEX_FILE ]]; then
-  echo usage: analyze_hex.sh --file \<contract .hex file\> --timeout \<timeout\>
-  exit 1
-elif [[ -z $TIMEOUT ]]; then
-  TIMEOUT=120
+if [[ -z "${HEX_FILE:-}" ]]; then
+    echo "usage: analyze_hex.sh --file <contract .hex file> [--timeout <timeout>] [--fix] [--loop]"
+    exit 1
+fi
 
-elif [ ! -f $HEX_FILE ]; then
-  echo $HEX_FILE is not a file
-  exit 1
+if [[ ! -f "$HEX_FILE" ]]; then
+    echo "$HEX_FILE is not a file"
+    exit 1
+fi
+
+# Downstream analysis expects the input file to be named contract.hex.
+# If the user provides another file name, normalize it to ./contract.hex.
+if [[ "$(basename "$HEX_FILE")" != "contract.hex" ]]; then
+    cp -- "$HEX_FILE" contract.hex
+    HEX_FILE="contract.hex"
 fi
 
 FILEPATH=`readlink -f "${BASH_SOURCE[0]}"`
