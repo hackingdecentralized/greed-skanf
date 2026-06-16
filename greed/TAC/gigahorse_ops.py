@@ -116,7 +116,8 @@ class TAC_Phi(TAC_Statement):
 
         # transfer value from most recent write to result
         state.registers[self.res1_var] = state.registers[most_recent_write_register_name]
-        state.registers.register(most_recent_write_register_name).phi_block_id = (current_block_id, current_block_count)
+        most_recent_write_register = state.registers.register(most_recent_write_register_name)
+        most_recent_write_register.phi_block_id = (current_block_id, current_block_count)
 
         state.set_next_pc()
         return [state]

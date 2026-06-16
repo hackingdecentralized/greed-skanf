@@ -6,6 +6,7 @@ from greed import options as opt
 from greed.memory import LambdaMemory, PartialConcreteStorage
 from greed.solver.shortcuts import *
 from greed.state_plugins import SimStatePlugin, SimStateSolver, SimStateGlobals, SimStateInspect, ShaResolver
+from greed.state_plugins.registers import SimStateRegisters
 from greed.utils.exceptions import VMNoSuccessors, VMUnexpectedSuccessors
 from greed.utils.exceptions import VMSymbolicError
 from greed.utils.extra import UUIDGenerator
@@ -31,7 +32,7 @@ class SymbolicEVMState:
     trace: typing.List["TAC_Statement"]
     memory: LambdaMemory
     options: typing.Dict[str, typing.Any]
-    registers: typing.Dict[str, typing.Any]
+    registers: SimStateRegisters
 
     # default plugins
     solver: SimStateSolver
@@ -69,7 +70,6 @@ class SymbolicEVMState:
         # We want every state to have an individual set
         # of options.
         self.options = options or dict()            
-        self.registers = dict()
         self.ctx = dict()
         self.callstack = list()
         self.returndata = {'size': BVV(0, 256), 'instruction_count': BVV(0, 256)}
@@ -285,6 +285,7 @@ class SymbolicEVMState:
         """
         self.register_plugin("solver", SimStateSolver())
         self.register_plugin("globals", SimStateGlobals())
+        self.register_plugin("registers", SimStateRegisters())
         
         sha_resolver = ShaResolver() 
         self.register_plugin("sha_resolver",sha_resolver)
@@ -314,7 +315,7 @@ class SymbolicEVMState:
 
         new_state.memory = self.memory.copy(new_state=new_state)
         new_state.storage = self.storage.copy(new_state=new_state)
-        new_state.registers = dict(self.registers)
+        new_state.registers = self.registers.copy()
         new_state.ctx = dict(self.ctx)
         new_state.options = list(self.options)
         new_state.callstack = list(self.callstack)
